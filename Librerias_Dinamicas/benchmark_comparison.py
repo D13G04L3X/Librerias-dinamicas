@@ -89,10 +89,15 @@ def run_benchmarks():
         if SWIG_AVAILABLE:
             swig_model = hmm.HMM()
         
-        # Benchmark Reconocimiento
-        print("Función: Reconocimiento")
+        # Benchmark Reconocimiento (Viterbi)
+        print("Función: Reconocimiento (Viterbi)")
         if PYTHON_AVAILABLE:
-            py_time, py_result = benchmark_function(python_model.reconocimiento, (seq,), 1000)
+            # Usar viterbi para obtener estados y convertir a string H/L
+            def python_reconocimiento(seq):
+                states = python_model.viterbi(seq)
+                return ''.join('H' if s == 1 else 'L' for s in states)
+            
+            py_time, py_result = benchmark_function(python_reconocimiento, (seq,), 1000)
             print(f"  Python nativo: {py_time*1000:.4f} ms")
         else:
             py_time, py_result = None, None
@@ -117,7 +122,12 @@ def run_benchmarks():
         # Benchmark Evaluación
         print("Función: Evaluación")
         if PYTHON_AVAILABLE:
-            py_time_eval, py_result_eval = benchmark_function(python_model.evaluacion, (seq,), 1000)
+            # Usar evaluacion que devuelve (prob, log2_score)
+            def python_evaluacion(seq):
+                prob, log2_score = python_model.evaluacion(seq)
+                return prob  # Solo devolver la probabilidad para comparar
+            
+            py_time_eval, py_result_eval = benchmark_function(python_evaluacion, (seq,), 1000)
             print(f"  Python nativo: {py_time_eval*1000:.4f} ms")
         else:
             py_time_eval, py_result_eval = None, None

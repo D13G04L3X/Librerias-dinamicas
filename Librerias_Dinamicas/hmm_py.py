@@ -146,7 +146,7 @@ if __name__ == "__main__":
     model = HMM()
 
     # ejemplo de la imagen
-    seq = "GGCACTGAA"
+    seq = "ATCGGATCG"
     states, log2score = model.viterbi_with_score(seq)
     prob_vit = 2 ** log2score
     print("Sequence:", seq)
