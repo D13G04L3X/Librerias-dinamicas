@@ -146,7 +146,7 @@ if __name__ == "__main__":
     model = HMM()
 
     # ejemplo de la imagen
-    seq = "ATCGGATCG"
+    seq = "GGCACTGAA"
     states, log2score = model.viterbi_with_score(seq)
     prob_vit = 2 ** log2score
     print("Sequence:", seq)
@@ -154,7 +154,3 @@ if __name__ == "__main__":
     print("Viterbi log2 score:", f"{log2score:.2f}")
     print("Viterbi probability:", f"{prob_vit:.2e}")
     print()
-    # también muestro la prob total (forward) por si te interesa
-    log2_total = model.evaluate_log2(seq)
-    print("Log2 total (forward sum):", f"{log2_total:.6f}")
-    print("Total probability (forward):", f"{2**log2_total:.2e}")
