@@ -14,17 +14,21 @@ class HMM:
                  A = None,           # matriz de transición 2x2: A[i][j] = P(s_j | s_i)
                  pi = None,          # vector inicial 2: P(s_i at t=0)
                  B = None):          # emisiones: B[state][symbol_index]
-        # default: ejemplo plausible (ajusta según la figura del enunciado)
+        # Según Figura 2: estados L (0) y H (1)
         if A is None:
-            A = [[0.99, 0.01],
-                 [0.01, 0.99]]
+            # Transiciones: L->L=0.6, L->H=0.4, H->H=0.5, H->L=0.5
+            A = [[0.6, 0.4],
+                 [0.5, 0.5]]
         if pi is None:
+            # Probabilidades iniciales: Start->L=0.5, Start->H=0.5
             pi = [0.5, 0.5]
         if B is None:
-            # ejemplo: non-coding (uniforme), coding (biased)
+            # Emisiones según Figura 2:
+            # L: A=0.3, C=0.2, G=0.2, T=0.3
+            # H: A=0.2, C=0.3, G=0.3, T=0.2
             B = [
-                [0.25,0.25,0.25,0.25],   # N
-                [0.15,0.35,0.35,0.15]    # C (ejemplo: más G/C)
+                [0.3,0.2,0.2,0.3],   # L
+                [0.2,0.3,0.3,0.2]    # H
             ]
         self.A = A
         self.pi = pi
@@ -117,29 +121,48 @@ class HMM:
             beta[t] = b
         return beta
 
-    def posterior_decode(self, seq: str, threshold: float = 0.5) -> List[int]:
+    def viterbi(self, seq: str) -> List[int]:
         """
-        Calcula la prob posterior por posición de estar en estado 'coding' (1)
-        y devuelve lista 0/1 según threshold.
+        Algoritmo de Viterbi: encuentra la secuencia de estados más probable
+        Usa log2 para evitar problemas de precisión numérica
+        Devuelve lista de estados 0/1 (L/H)
         """
         n = len(seq)
         if n == 0:
             return []
-        alpha, scales = self._forward_scaled(seq)
-        beta = self._backward_scaled(seq, scales)
+        
+        # Inicialización con log2
+        v = [[float('-inf'), float('-inf')] for _ in range(n)]
+        path = [[0, 0] for _ in range(n)]
+        
+        # t = 0
+        for i in range(2):
+            v[0][i] = math.log2(self.pi[i]) + math.log2(self._emit_prob(i, seq[0]))
+        
+        # Recursión
+        for t in range(1, n):
+            for j in range(2):
+                max_log_prob = float('-inf')
+                best_state = 0
+                for i in range(2):
+                    log_prob = v[t-1][i] + math.log2(self.A[i][j]) + math.log2(self._emit_prob(j, seq[t]))
+                    if log_prob > max_log_prob:
+                        max_log_prob = log_prob
+                        best_state = i
+                v[t][j] = max_log_prob
+                path[t][j] = best_state
+        
+        # Terminación
+        best_final_state = 0 if v[n-1][0] > v[n-1][1] else 1
+        
+        # Backtracking
+        states = [0] * n
+        states[n-1] = best_final_state
+        for t in range(n-2, -1, -1):
+            states[t] = path[t+1][states[t+1]]
+        
+        return states
 
-        posterior = []
-        # normalization per position: gamma_i(t) proportional to alpha[t][i] * beta[t][i]
-        for t in range(n):
-            g0 = alpha[t][0] * beta[t][0]
-            g1 = alpha[t][1] * beta[t][1]
-            s = g0 + g1
-            if s == 0:
-                p1 = 0.0
-            else:
-                p1 = g1 / s
-            posterior.append(1 if p1 >= threshold else 0)
-        return posterior
 
     def segments_from_posterior(self, posterior: List[int]) -> List[Tuple[int,int]]:
         """
@@ -158,16 +181,146 @@ class HMM:
             i += 1
         return segs
 
+    def reconocimiento(self, seq: str) -> str:
+        """
+        Función de Reconocimiento: identifica regiones H/L
+        Usa el algoritmo de Viterbi con log2 para encontrar la secuencia de estados más probable
+        Devuelve string con 'H' para alta probabilidad y 'L' para baja probabilidad
+        """
+        viterbi_states = self.viterbi(seq)
+        result = ""
+        for state in viterbi_states:
+            result += 'H' if state == 1 else 'L'
+        return result
+
+    def evaluacion(self, seq: str) -> float:
+        """
+        Función de Evaluación: calcula probabilidad de la secuencia
+        Usa log2 para consistencia con Viterbi
+        Devuelve la probabilidad (no log-probabilidad)
+        """
+        log2_prob = self.evaluate_log2(seq)
+        return 2 ** log2_prob
+    
+    def evaluate_log2(self, seq: str) -> float:
+        """
+        Forward algorithm con escalado usando log2. Devuelve log2(P(seq | modelo)).
+        """
+        n = len(seq)
+        if n == 0:
+            return float('-inf')
+
+        # alpha_scaled[t][i] but guardamos sólo el vector actual
+        # scaling factors
+        scales = []
+        # t=0
+        a0 = [self.pi[i] * self._emit_prob(i, seq[0]) for i in (0,1)]
+        s0 = sum(a0)
+        if s0 == 0:
+            return float('-inf')
+        a0 = [x / s0 for x in a0]
+        scales.append(s0)
+        prev = a0
+
+        for t in range(1,n):
+            obs = seq[t]
+            cur = [0.0,0.0]
+            for j in (0,1):
+                s = 0.0
+                for i in (0,1):
+                    s += prev[i] * self.A[i][j]
+                cur[j] = s * self._emit_prob(j, obs)
+            st = sum(cur)
+            if st == 0:
+                return float('-inf')
+            cur = [x / st for x in cur]
+            scales.append(st)
+            prev = cur
+
+        # log2 P(seq) = sum(log2(scales[t]))
+        log2p = sum(math.log2(s) for s in scales)
+        return log2p
+
 # pequeño helper para generar secuencias aleatorias (útil en benchmarks)
 import random
 def random_dna(length):
     return ''.join(random.choice('ACGT') for _ in range(length))
 
 if __name__ == "__main__":
-    # demo de uso
+    print("=== Librería Dinámica HMM para Análisis de Secuencias de ADN ===")
+    print()
+    
+    # Crear modelo
     model = HMM()
-    s = "ACGTGCGTACGTTAGC"
-    print("Log-prob (evaluate):", model.evaluate(s))
-    post = model.posterior_decode(s, threshold=0.6)
-    print("Posterior (1=coding):", post)
-    print("Segments:", model.segments_from_posterior(post))
+    
+    # Permitir al usuario ingresar la secuencia
+    print("Ingrese la secuencia de ADN que desea analizar:")
+    print("(Solo use las letras A, C, G, T)")
+    print("Ejemplo: ATCGGATCGCG")
+    print()
+    
+    while True:
+        try:
+            secuencia = input("Secuencia: ").strip().upper()
+            
+            # Validar que solo contenga A, C, G, T
+            if not secuencia:
+                print("Error: La secuencia no puede estar vacía.")
+                continue
+                
+            if not all(c in 'ACGT' for c in secuencia):
+                print("Error: La secuencia solo puede contener las letras A, C, G, T.")
+                print("Intente de nuevo:")
+                continue
+                
+            break
+            
+        except KeyboardInterrupt:
+            print("\n\nPrograma terminado por el usuario.")
+            exit()
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
+    
+    print()
+    print("=== Análisis de la Secuencia ===")
+    print(f"Secuencia ingresada: {secuencia}")
+    print(f"Longitud: {len(secuencia)} nucleótidos")
+    print()
+    
+    # Función de Reconocimiento
+    print("🔍 Función de Reconocimiento (Viterbi con log2):")
+    reconocimiento_result = model.reconocimiento(secuencia)
+    print(f"Regiones identificadas: {reconocimiento_result}")
+    
+    # Explicar el resultado
+    h_count = reconocimiento_result.count('H')
+    l_count = reconocimiento_result.count('L')
+    print(f"  - Regiones de alta probabilidad (H): {h_count}")
+    print(f"  - Regiones de baja probabilidad (L): {l_count}")
+    
+    # Función de Evaluación
+    print()
+    print("📊 Función de Evaluación:")
+    evaluacion_result = model.evaluacion(secuencia)
+    print(f"Probabilidad de la secuencia: {evaluacion_result:.2e}")
+    print(f"Log2-probabilidad: {model.evaluate_log2(secuencia):.6f}")
+    
+    # Información adicional
+    print()
+    print("=== Información Adicional ===")
+    viterbi_states = model.viterbi(secuencia)
+    print(f"Estados Viterbi: {viterbi_states}")
+    
+    # Encontrar segmentos de alta probabilidad
+    segmentos_h = model.segments_from_posterior(viterbi_states)
+    if segmentos_h:
+        print(f"Segmentos de alta probabilidad: {segmentos_h}")
+        for start, end in segmentos_h:
+            print(f"  - Posiciones {start}-{end}: {secuencia[start:end+1]}")
+    else:
+        print("No se encontraron segmentos de alta probabilidad.")
+    
+    print()
+    print("=== Análisis Completado ===")
+    print("¡Gracias por usar la librería dinámica HMM!")

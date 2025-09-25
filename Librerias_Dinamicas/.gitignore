@@ -1,0 +1,48 @@
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Archivos de SWIG
+*.wrap.cxx
+*.wrap.o
+*.o
+*.so
+
+# Archivos temporales
+*.tmp
+*.temp
+*~
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de compilación específicos del proyecto
+scr/cpp/swig/hmm_wrap.cxx
+scr/cpp/swig/hmm_wrap.o
+scr/cpp/swig/hmm.o
+scr/cpp/swig/_hmm.so
+scr/cpp/swig/hmm.py
+
+# Archivos de ejemplo generados
+example.cxx
+example.h
+example.i
+example_wrap.cxx
+example_wrap.o
+example.o
+_example.so
+
+# Scripts de prueba y diagnóstico (eliminados)
+debug_reconocimiento.py
+ajustar_modelo.py
+hmm_py_ajustado.py
+test_implementation.py

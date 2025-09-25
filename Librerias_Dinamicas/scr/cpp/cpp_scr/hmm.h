@@ -7,11 +7,17 @@
 
 class HMM {
 public:
-    // states: 0 = N, 1 = C
+    // states: 0 = L (Low), 1 = H (High) según Figura 2
     HMM();
     HMM(const std::vector<std::vector<double>>& A,
         const std::vector<double>& pi,
         const std::vector<std::vector<double>>& B);
+
+    // Función de Reconocimiento: identifica regiones H/L
+    std::string reconocimiento(const std::string &seq);
+    
+    // Función de Evaluación: calcula probabilidad de la secuencia
+    double evaluacion(const std::string &seq);
 
     // devuelve log prob (natural log) de la secuencia
     double evaluate(const std::string &seq);

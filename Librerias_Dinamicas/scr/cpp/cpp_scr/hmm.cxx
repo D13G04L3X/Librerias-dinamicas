@@ -4,11 +4,17 @@
 #include <stdexcept>
 
 HMM::HMM() {
-    A = {{0.99,0.01},{0.01,0.99}};
+    // Según Figura 2: estados L (0) y H (1)
+    // Transiciones: L->L=0.6, L->H=0.4, H->H=0.5, H->L=0.5
+    A = {{0.6,0.4},{0.5,0.5}};
+    // Probabilidades iniciales: Start->L=0.5, Start->H=0.5
     pi = {0.5,0.5};
+    // Emisiones según Figura 2:
+    // L: A=0.3, C=0.2, G=0.2, T=0.3
+    // H: A=0.2, C=0.3, G=0.3, T=0.2
     B = {
-        {0.25,0.25,0.25,0.25},
-        {0.15,0.35,0.35,0.15}
+        {0.3,0.2,0.2,0.3},  // L
+        {0.2,0.3,0.3,0.2}   // H
     };
 }
 
@@ -117,4 +123,19 @@ std::vector<int> HMM::posterior_decode(const std::string &seq, double threshold)
         out[t] = (p1 >= threshold) ? 1 : 0;
     }
     return out;
+}
+
+// Función de Reconocimiento: identifica regiones H/L
+std::string HMM::reconocimiento(const std::string &seq) {
+    std::vector<int> posterior = posterior_decode(seq, 0.5);
+    std::string result;
+    for (int state : posterior) {
+        result += (state == 1) ? 'H' : 'L';
+    }
+    return result;
+}
+
+// Función de Evaluación: calcula probabilidad de la secuencia
+double HMM::evaluacion(const std::string &seq) {
+    return evaluate(seq);
 }
